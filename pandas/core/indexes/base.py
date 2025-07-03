@@ -1913,12 +1913,12 @@ class Index(IndexOpsMixin, PandasObject):
         Parameters
         ----------
 
-        names : label or list of label or dict-like for MultiIndex
+        names : Hashable or a sequence of the previous or dict-like for MultiIndex
             Name(s) to set.
 
             .. versionchanged:: 1.3.0
 
-        level : int, label or list of int or label, optional
+        level : int, Hashable or a sequence of the previous, optional
             If the index is a MultiIndex and names is not dict-like, level(s) to set
             (None for all levels). Otherwise level must be None.
 
@@ -2023,7 +2023,7 @@ class Index(IndexOpsMixin, PandasObject):
 
         Parameters
         ----------
-        name : label or list of labels
+        name : Hashable or a sequence of the previous
             Name(s) to set.
         inplace : bool, default False
             Modifies the object directly, instead of creating a new Index or
@@ -2967,10 +2967,14 @@ class Index(IndexOpsMixin, PandasObject):
             and self.tz is not None
             and other.tz is not None
         ):
-            # GH#39328, GH#45357
-            left = self.tz_convert("UTC")
-            right = other.tz_convert("UTC")
-            return left, right
+            # GH#39328, GH#45357, GH#60080
+            # If both timezones are the same, no need to convert to UTC
+            if self.tz == other.tz:
+                return self, other
+            else:
+                left = self.tz_convert("UTC")
+                right = other.tz_convert("UTC")
+                return left, right
         return self, other
 
     @final
@@ -7022,6 +7026,23 @@ class Index(IndexOpsMixin, PandasObject):
         ----------
         copy : bool, default True
             Whether to make a copy in cases where no inference occurs.
+
+        Returns
+        -------
+        Index
+            An Index with a new dtype if the dtype was inferred
+            or a shallow copy if the dtype could not be inferred.
+
+        See Also
+        --------
+        Index.inferred_type: Return a string of the type inferred from the values.
+
+        Examples
+        --------
+        >>> pd.Index(["a", 1]).infer_objects()
+        Index(['a', '1'], dtype='object')
+        >>> pd.Index([1, 2], dtype="object").infer_objects()
+        Index([1, 2], dtype='int64')
         """
         if self._is_multi:
             raise NotImplementedError(
